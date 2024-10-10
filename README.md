@@ -42,7 +42,7 @@ ros2 launch tracer_base sensor.xml
 This command activate the sensor to gain the data with TF Tree.
 
 ```bash
-ros2 launch tracer_base ros2_aruco.xml
+ros2 launch tracer_base aruco.xml
 ```
 This command activate the aruco node to transfer the 3D Pose into the map coordinate.
 
