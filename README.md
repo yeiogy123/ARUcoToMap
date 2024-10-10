@@ -30,7 +30,23 @@ This command is used to launch the localization server with the map of the real 
 Launch the path planner server:
 
 ```bash
-ros2 launch path_planner_server pathplanner.launch.py
+ros2 launch path_planner_server navigation.launch.py
 ```
 
 This command initiates the path planning process, enabling the robot to navigate autonomously in the warehouse.
+
+```bash
+ros2 launch tracer_base sensor.xml
+```
+
+This command activate the sensor to gain the data with TF Tree.
+
+```bash
+ros2 launch tracer_base ros2_aruco.xml
+```
+This command activate the aruco node to transfer the 3D Pose into the map coordinate.
+
+```bash
+ros2 run navigatethroughpose navigatethroughpose
+```
+This command moves the Tracer from one point pose to another point pose with three times, then moving to the aruco pose position based on map coordinate.
