@@ -208,7 +208,7 @@ def main():
 
     initial_pose = localization_node.initial_pose_publisher.get_initial_pose()
     if initial_pose:
-        logger.info('Got initial pose from RTAB-Map')
+        logger.info('Got initial pose from TF')
         navigator.setInitialPose(initial_pose)
     else:
         initial_pose = PoseStamped()
