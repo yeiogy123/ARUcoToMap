@@ -1,0 +1,14 @@
+running egg_info
+creating build/localization_package/localization.egg-info
+writing build/localization_package/localization.egg-info/PKG-INFO
+writing dependency_links to build/localization_package/localization.egg-info/dependency_links.txt
+writing entry points to build/localization_package/localization.egg-info/entry_points.txt
+writing requirements to build/localization_package/localization.egg-info/requires.txt
+writing top-level names to build/localization_package/localization.egg-info/top_level.txt
+writing manifest file 'build/localization_package/localization.egg-info/SOURCES.txt'
+reading manifest file 'build/localization_package/localization.egg-info/SOURCES.txt'
+writing manifest file 'build/localization_package/localization.egg-info/SOURCES.txt'
+running build
+running install
+running install_data
+error: can't copy 'resource/localization': doesn't exist or not a regular file
