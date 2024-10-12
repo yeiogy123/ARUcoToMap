@@ -42,6 +42,7 @@ class NavigateToARUco(rclpy.node.Node):
             try:
                 max_attempts = 5
                 attempts = 0
+                print('here')
                 while attempts < max_attempts:
                     pose_stamped = PoseStamped()
                     pose_stamped.header.stamp = navigator.get_clock().now().to_msg()
@@ -116,7 +117,6 @@ class LocalizationNode(Node):
                 time=Time(), 
                 timeout=Duration(seconds=2.0)
             )
-            # 获取 odom 到 base_link 的变换
             odom_to_base_link = self.tf_buffer.lookup_transform(
                 target_frame='odom',
                 source_frame='base_link',
@@ -236,19 +236,19 @@ def main():
     goal_pose2 = PoseStamped()
     goal_pose2.header.frame_id = 'map'
     goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose2.pose.position.x = -7.0
+    goal_pose2.pose.position.x = -6.7
     goal_pose2.pose.position.y = 0.0
     goal_pose2.pose.orientation.w = 0.0
     goal_pose2.pose.orientation.z = 1.0
 
     # Append the poses as per your request
     goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
-    goal_poses.append(goal_pose2)
+    # goal_poses.append(goal_pose1)
+    # goal_poses.append(goal_pose2)
+    # goal_poses.append(goal_pose1)
+    # goal_poses.append(goal_pose2)
+    # goal_poses.append(goal_pose1)
+    # goal_poses.append(goal_pose2)
 
     # Start following the waypoints
     nav_start = navigator.get_clock().now()
@@ -271,7 +271,7 @@ def main():
                 navigator.cancelTask()
 
             # Preempt task with new goal if it takes too long
-            if now - nav_start > Duration(seconds=35.0):
+            if now - nav_start > Duration(seconds=100.0):
                 goal_pose4 = PoseStamped()
                 goal_pose4.header.frame_id = 'map'
                 goal_pose4.header.stamp = now.to_msg()
@@ -282,6 +282,11 @@ def main():
                 nav_start = now
                 navigator.goToPose(goal_pose4)
 
+    aruco_navigator = NavigateToARUco(navigator)
+    while rclpy.ok() and not navigator.isTaskComplete():
+        print("spin")
+        rclpy.spin_once(aruco_navigator, timeout_sec=1.0)
+    # 你的導航邏輯
     result = navigator.getResult()
     if result == TaskResult.SUCCEEDED:
         print('Goal succeeded!')
@@ -292,10 +297,9 @@ def main():
     else:
         print('Goal has an invalid return status!')      
     # Check result of navigation
-    aruco_navigator = NavigateToARUco(navigator)
     # 關閉導航與節點
     aruco_navigator.destroy_node()
-    initial_pose_publisher.destroy_node()
+    localization_node.destroy_node()
     navigator.lifecycleShutdown()
 
     rclpy.shutdown()
