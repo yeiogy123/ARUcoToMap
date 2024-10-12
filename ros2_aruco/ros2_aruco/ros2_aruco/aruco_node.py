@@ -42,8 +42,10 @@ from tf2_ros import Buffer, TransformListener
 import tf2_geometry_msgs
 from geometry_msgs.msg import PoseStamped
 import tf2_ros
-import subprocess  # Import subprocess module
-import json 
+from rclpy.time import Time
+from rclpy.duration import Duration
+from tf2_ros import Buffer, TransformListener, TransformException
+
 class ArucoNode(rclpy.node.Node):
     def __init__(self):
         super().__init__("aruco_node")
@@ -147,6 +149,8 @@ class ArucoNode(rclpy.node.Node):
         self.info_msg = None
         self.intrinsic_mat = None
         self.distortion = None
+        self.marker_ids = None
+        self.pose_stamped = None
 
         self.aruco_dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
         self.aruco_parameters = cv2.aruco.DetectorParameters()
@@ -154,12 +158,56 @@ class ArucoNode(rclpy.node.Node):
         self.first_image_processed = False
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.timer = self.create_timer(1.0, self.timer_callback)
+        self.pose_stamped = None
+        self.pose_array = PoseArray()
+        self.markers = ArucoMarkers()
+
+
+    def timer_callback(self):
+        if self.marker_ids is not None and self.pose_stamped is not None:
+            try:
+                    # 获取 map 到 odom 的变换
+                map_to_odom = self.tf_buffer.lookup_transform(
+                    target_frame='map',
+                    source_frame='odom',
+                    time=Time(),  # 使用当前时间
+                    timeout=Duration(seconds=2.0)
+                )
+                # 获取 odom 到 base_link 的变换
+                odom_to_base_link = self.tf_buffer.lookup_transform(
+                    target_frame='odom',
+                    source_frame='base_link',
+                    time=Time(),  # 使用当前时间
+                    timeout=Duration(seconds=2.0)
+                )
+                base_link_to_camera_link = self.tf_buffer.lookup_transform(
+                    target_frame='base_link',
+                    source_frame='camera_link',
+                    time=Time(),  # 使用当前时间
+                    timeout=Duration(seconds=2.0)
+                )  
+                combined_transform1 = self.combine_transforms(map_to_odom, odom_to_base_link)
+                transform = self.combine_transforms(combined_transform1, base_link_to_camera_link)
+                pose = tf2_geometry_msgs.do_transform_pose(self.pose_stamped.pose, transform)
+                self.get_logger().info(f"Transformed Pose: {pose}")
+                if pose is not None and self.first_image_processed is not True:
+                    self.print_transform(transform)
+                # 將轉換後的姿態添加到 pose_array 和 markers 中
+                    self.pose_array.poses.append(pose)
+                    self.markers.poses.append(pose)
+                    self.markers.marker_ids.append(int(self.marker_ids[0]))  # Ensure marker_id is correct
+                    self.get_logger().info(f"PoseArray: {self.pose_array}")
+                    self.poses_pub.publish(self.pose_array)
+                    self.markers_pub.publish(self.markers)
+                    self.first_image_processed = True
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                self.get_logger().error(f"TF Error: {e}")
 
     def info_callback(self, info_msg):
         self.info_msg = info_msg
         self.intrinsic_mat = np.reshape(np.array(self.info_msg.k), (3, 3))
         self.distortion = np.array(self.info_msg.d)
-        # Assume that camera parameters will remain the same...
         self.destroy_subscription(self.info_sub)
 
     def image_callback(self, img_msg):
@@ -170,22 +218,21 @@ class ArucoNode(rclpy.node.Node):
             return
 
         cv_image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="mono8")
-        markers = ArucoMarkers()
-        pose_array = PoseArray()
         if self.camera_frame == "":
-            markers.header.frame_id = self.info_msg.header.frame_id
-            pose_array.header.frame_id = "map"
+            self.markers.header.frame_id = self.info_msg.header.frame_id
+            self.pose_array.header.frame_id = "map"
         else:
-            markers.header.frame_id = self.camera_frame
-            pose_array.header.frame_id = self.camera_frame
+            self.markers.header.frame_id = self.camera_frame
+            self.pose_array.header.frame_id = self.camera_frame
 
-        markers.header.stamp = img_msg.header.stamp
-        pose_array.header.stamp = img_msg.header.stamp
+        self.markers.header.stamp = img_msg.header.stamp
+        self.pose_array.header.stamp = img_msg.header.stamp
         # self.get_logger().info(f"frame id is = {img_msg.header.frame_id}")
         corners, marker_ids, rejected = cv2.aruco.detectMarkers(
             cv_image, self.aruco_dictionary, parameters=self.aruco_parameters
         )
         if marker_ids is not None:
+            self.marker_ids = marker_ids
             if cv2.__version__ > "4.0.0":
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
                     corners, self.marker_size, self.intrinsic_mat, self.distortion
@@ -201,80 +248,89 @@ class ArucoNode(rclpy.node.Node):
                 pose.position.x = tvecs[i][0][0]
                 pose.position.y = tvecs[i][0][1]
                 pose.position.z = tvecs[i][0][2]
-
                 rot_matrix = np.eye(4)
                 rot_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
                 quat = tf_transformations.quaternion_from_matrix(rot_matrix)
-
                 pose.orientation.x = quat[0]
                 pose.orientation.y = quat[1]
                 pose.orientation.z = quat[2]
                 pose.orientation.w = quat[3]
-
                 pose_stamped = PoseStamped()
                 pose_stamped.header.frame_id = self.info_msg.header.frame_id
                 pose_stamped.header.stamp = img_msg.header.stamp
                 pose_stamped.pose = pose
-                if pose_stamped.header.frame_id == "":
-                    self.get_logger().error("PoseStamped frame_id is empty!")
-                    continue
+                self.pose_stamped = pose_stamped
+                # if pose_stamped.header.frame_id == "":
+                #     self.get_logger().error("PoseStamped frame_id is empty!")
+                #     continue
 
-                try:
-                    transform = self.tf_buffer.lookup_transform(target_frame='map', source_frame='camera_link', time=rclpy.time.Time())
-                    self.get_logger().info(f"Transform: {transform}")
+                # try:
+                #     transform = self.tf_buffer.lookup_transform(target_frame='map', source_frame='camera_link', time=rclpy.time.Time())
+                #     self.get_logger().info(f"Transform: {transform}")
 
-                    pose_transformed = tf2_geometry_msgs.do_transform_pose(pose_stamped.pose, transform)
-                    pose = pose_transformed
-                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                    self.get_logger().error(f"TF Error: {e}")
-                    continue
-                self.get_logger().info(f"{pose}")
-                pose_array.poses.append(pose)
-                markers.poses.append(pose)
-                markers.marker_ids.append(marker_id[0])
+                #     pose_transformed = tf2_geometry_msgs.do_transform_pose(pose_stamped.pose, transform)
+                #     pose = pose_transformed
+                # except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                #     self.get_logger().error(f"TF Error: {e}")
+                #     continue
+                # self.get_logger().info(f"{pose}")
+                # pose_array.poses.append(pose)
+                # markers.poses.append(pose)
+                # markers.marker_ids.append(marker_id[0])
             
 
-            self.get_logger().info(f"{pose_array}")
-            self.poses_pub.publish(pose_array)
-            self.markers_pub.publish(markers)
-            self.first_image_processed = True
-            # if pose_array.poses:
-            #     self.send_goal_to_navigation(pose_array.poses[0])
-            # else:
-            #     self.get_logger().warn("No valid poses found to send to navigation")
+            # self.get_logger().info(f"{self.pose_array}")
+            # self.poses_pub.publish(self.pose_array)
+            # self.markers_pub.publish(self.markers)
+            # self.first_image_processed = True
 
+    def combine_transforms(self, transform1, transform2):
+        # 将两个变换结合
+        t1_translation = transform1.transform.translation
+        t1_rotation = transform1.transform.rotation
+        t2_translation = transform2.transform.translation
+        t2_rotation = transform2.transform.rotation
 
-    # def send_goal_to_navigation(self, pose):
-    #     # Construct the goal message in the required format
-    #     # goal = { pose: {header: {frame_id: 'map'},pose:{position: {x: pose.position.x,y: pose.position.y,z: pose.position.z},orientation: {x: pose.orientation.x,y: pose.orientation.y,z: pose.orientation.z,w: pose.orientation.w}}}}
-    #     x = pose.position.x
-    #     y = pose.position.y
-    #     z = pose.position.z
-    #     ox = pose.orientation.x
-    #     oy = pose.orientation.y
-    #     oz = pose.orientation.z
-    #     ow = pose.orientation.w
-    #     goal_str = f"\"{{ pose: {{header: {{frame_id: \'map\'}},pose: {{position: {{x: {x}, y: {y}, z: {z}}},orientation: {{x: {ox}, y: {oy}, z: {oz}, w: {ow}}}}}}}}}\""
-    #     ## command = [
-    #     #     'ros2', 'action', 'send_goal', '/navigate_to_pose', 'nav2_msgs/action/NavigateToPose', goal_str
-    #     # ]
-    #     command = 'ros2' + ' action' + ' send_goal'+' /navigate_to_pose' +' nav2_msgs/action/NavigateToPose' + ' '+goal_str
-    #         # 將目標資料轉換為JSON格式
+        # 转换成矩阵表示
+        t1_matrix = tf_transformations.translation_matrix(
+            [t1_translation.x, t1_translation.y, t1_translation.z])
+        t1_rotation_matrix = tf_transformations.quaternion_matrix(
+            [t1_rotation.x, t1_rotation.y, t1_rotation.z, t1_rotation.w])
+        t1_matrix = tf_transformations.concatenate_matrices(t1_matrix, t1_rotation_matrix)
 
-    #     # # Convert the goal message to JSON
-    #     # goal_json = json.dumps(goal, indent=4)
-    #     # goal_json = f'"{goal_json}"'
-    #     # self.get_logger().info(f"{goal_json}")
-    #     # Call the `ros2 action send_goal` command
-    #     try:
-    #         self.get_logger().info(f"{command}")
+        t2_matrix = tf_transformations.translation_matrix(
+            [t2_translation.x, t2_translation.y, t2_translation.z])
+        t2_rotation_matrix = tf_transformations.quaternion_matrix(
+            [t2_rotation.x, t2_rotation.y, t2_rotation.z, t2_rotation.w])
+        t2_matrix = tf_transformations.concatenate_matrices(t2_matrix, t2_rotation_matrix)
 
-    #         result = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,shell=True)
-    #         for line in iter(result.stdout.readline, ' '):
-    #             self.get_logger().info(line)
-    #         self.get_logger().info(f"Send goal result: {result.stdout}")
-    #     except subprocess.CalledProcessError as e:
-    #         self.get_logger().error(f"Failed to send goal: {e.stderr}")
+        # 矩阵相乘
+        combined_matrix = tf_transformations.concatenate_matrices(t1_matrix, t2_matrix)
+
+        # 将结果转换回 TransformStamped
+        combined_transform = transform1
+        combined_transform.transform.translation.x, combined_transform.transform.translation.y, combined_transform.transform.translation.z = tf_transformations.translation_from_matrix(
+            combined_matrix)
+        combined_transform.transform.rotation.x, combined_transform.transform.rotation.y, combined_transform.transform.rotation.z, combined_transform.transform.rotation.w = tf_transformations.quaternion_from_matrix(
+            combined_matrix)
+
+        return combined_transform
+
+    def print_transform(self, trans):
+        translation = trans.transform.translation
+        rotation = trans.transform.rotation
+        rot_matrix = tf_transformations.quaternion_matrix([rotation.x, rotation.y, rotation.z, rotation.w])
+
+        self.get_logger().info(f'At time {trans.header.stamp.sec}.{trans.header.stamp.nanosec}')
+        self.get_logger().info(f'- Translation: [{translation.x:.3f}, {translation.y:.3f}, {translation.z:.3f}]')
+        self.get_logger().info(f'- Rotation: in Quaternion [{rotation.x:.3f}, {rotation.y:.3f}, {rotation.z:.3f}, {rotation.w:.3f}]')
+        rpy_rad = tf_transformations.euler_from_quaternion([rotation.x, rotation.y, rotation.z, rotation.w])
+        rpy_deg = [angle * 180.0 / 3.141592653589793 for angle in rpy_rad]
+        self.get_logger().info(f'- Rotation: in RPY (radian) [{rpy_rad[0]:.3f}, {rpy_rad[1]:.3f}, {rpy_rad[2]:.3f}]')
+        self.get_logger().info(f'- Rotation: in RPY (degree) [{rpy_deg[0]:.3f}, {rpy_deg[1]:.3f}, {rpy_deg[2]:.3f}]')
+        self.get_logger().info('- Matrix:')
+        for row in rot_matrix:
+            self.get_logger().info(f' {row[0]:.3f} {row[1]:.3f} {row[2]:.3f} {row[3]:.3f}')
 
 def main():
     rclpy.init()
