@@ -167,40 +167,40 @@ class ArucoNode(rclpy.node.Node):
     def timer_callback(self):
         if self.marker_ids is not None and self.pose_stamped is not None:
             try:
-                    # 获取 map 到 odom 的变换
                 map_to_odom = self.tf_buffer.lookup_transform(
                     target_frame='map',
                     source_frame='odom',
-                    time=Time(),  # 使用当前时间
+                    time=Time(),  
                     timeout=Duration(seconds=2.0)
                 )
-                # 获取 odom 到 base_link 的变换
                 odom_to_base_link = self.tf_buffer.lookup_transform(
                     target_frame='odom',
                     source_frame='base_link',
-                    time=Time(),  # 使用当前时间
+                    time=Time(),  
                     timeout=Duration(seconds=2.0)
                 )
                 base_link_to_camera_link = self.tf_buffer.lookup_transform(
                     target_frame='base_link',
                     source_frame='camera_link',
-                    time=Time(),  # 使用当前时间
+                    time=Time(),  
                     timeout=Duration(seconds=2.0)
                 )  
                 combined_transform1 = self.combine_transforms(map_to_odom, odom_to_base_link)
                 transform = self.combine_transforms(combined_transform1, base_link_to_camera_link)
                 pose = tf2_geometry_msgs.do_transform_pose(self.pose_stamped.pose, transform)
-                self.get_logger().info(f"Transformed Pose: {pose}")
                 if pose is not None and self.first_image_processed is not True:
+                    self.get_logger().info(f"Transformed Pose: {pose}")
                     self.print_transform(transform)
-                # 將轉換後的姿態添加到 pose_array 和 markers 中
                     self.pose_array.poses.append(pose)
                     self.markers.poses.append(pose)
-                    self.markers.marker_ids.append(int(self.marker_ids[0]))  # Ensure marker_id is correct
+                    self.markers.marker_ids.append(int(self.marker_ids[0]))
                     self.get_logger().info(f"PoseArray: {self.pose_array}")
                     self.poses_pub.publish(self.pose_array)
                     self.markers_pub.publish(self.markers)
                     self.first_image_processed = True
+                if pose is not None and self.first_image_processed is True:
+                    self.poses_pub.publish(self.pose_array)
+
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 self.get_logger().error(f"TF Error: {e}")
 
@@ -227,7 +227,6 @@ class ArucoNode(rclpy.node.Node):
 
         self.markers.header.stamp = img_msg.header.stamp
         self.pose_array.header.stamp = img_msg.header.stamp
-        # self.get_logger().info(f"frame id is = {img_msg.header.frame_id}")
         corners, marker_ids, rejected = cv2.aruco.detectMarkers(
             cv_image, self.aruco_dictionary, parameters=self.aruco_parameters
         )
@@ -245,9 +244,9 @@ class ArucoNode(rclpy.node.Node):
             for i, marker_id in enumerate(marker_ids):
                 pose = Pose()
                 self.get_logger().info(f"{tvecs[i][0][0]}, {tvecs[i][0][1]}, {tvecs[i][0][2]}")
-                pose.position.x = tvecs[i][0][0]
+                pose.position.x = tvecs[i][0][2]
                 pose.position.y = tvecs[i][0][1]
-                pose.position.z = tvecs[i][0][2]
+                pose.position.z = tvecs[i][0][0]
                 rot_matrix = np.eye(4)
                 rot_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
                 quat = tf_transformations.quaternion_from_matrix(rot_matrix)
@@ -260,38 +259,13 @@ class ArucoNode(rclpy.node.Node):
                 pose_stamped.header.stamp = img_msg.header.stamp
                 pose_stamped.pose = pose
                 self.pose_stamped = pose_stamped
-                # if pose_stamped.header.frame_id == "":
-                #     self.get_logger().error("PoseStamped frame_id is empty!")
-                #     continue
-
-                # try:
-                #     transform = self.tf_buffer.lookup_transform(target_frame='map', source_frame='camera_link', time=rclpy.time.Time())
-                #     self.get_logger().info(f"Transform: {transform}")
-
-                #     pose_transformed = tf2_geometry_msgs.do_transform_pose(pose_stamped.pose, transform)
-                #     pose = pose_transformed
-                # except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                #     self.get_logger().error(f"TF Error: {e}")
-                #     continue
-                # self.get_logger().info(f"{pose}")
-                # pose_array.poses.append(pose)
-                # markers.poses.append(pose)
-                # markers.marker_ids.append(marker_id[0])
-            
-
-            # self.get_logger().info(f"{self.pose_array}")
-            # self.poses_pub.publish(self.pose_array)
-            # self.markers_pub.publish(self.markers)
-            # self.first_image_processed = True
 
     def combine_transforms(self, transform1, transform2):
-        # 将两个变换结合
         t1_translation = transform1.transform.translation
         t1_rotation = transform1.transform.rotation
         t2_translation = transform2.transform.translation
         t2_rotation = transform2.transform.rotation
 
-        # 转换成矩阵表示
         t1_matrix = tf_transformations.translation_matrix(
             [t1_translation.x, t1_translation.y, t1_translation.z])
         t1_rotation_matrix = tf_transformations.quaternion_matrix(
@@ -304,10 +278,8 @@ class ArucoNode(rclpy.node.Node):
             [t2_rotation.x, t2_rotation.y, t2_rotation.z, t2_rotation.w])
         t2_matrix = tf_transformations.concatenate_matrices(t2_matrix, t2_rotation_matrix)
 
-        # 矩阵相乘
         combined_matrix = tf_transformations.concatenate_matrices(t1_matrix, t2_matrix)
 
-        # 将结果转换回 TransformStamped
         combined_transform = transform1
         combined_transform.transform.translation.x, combined_transform.transform.translation.y, combined_transform.transform.translation.z = tf_transformations.translation_from_matrix(
             combined_matrix)
