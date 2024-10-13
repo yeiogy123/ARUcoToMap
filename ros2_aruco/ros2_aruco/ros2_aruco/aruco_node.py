@@ -189,6 +189,7 @@ class ArucoNode(rclpy.node.Node):
                 transform = self.combine_transforms(combined_transform1, base_link_to_camera_link)
                 pose = tf2_geometry_msgs.do_transform_pose(self.pose_stamped.pose, transform)
                 if pose is not None and self.first_image_processed is not True:
+                    pose.position.x = pose.position.x + 1.5
                     self.get_logger().info(f"Transformed Pose: {pose}")
                     self.print_transform(transform)
                     self.pose_array.poses.append(pose)
@@ -245,7 +246,7 @@ class ArucoNode(rclpy.node.Node):
                 pose = Pose()
                 self.get_logger().info(f"{tvecs[i][0][0]}, {tvecs[i][0][1]}, {tvecs[i][0][2]}")
                 pose.position.x = tvecs[i][0][2]
-                pose.position.y = tvecs[i][0][1]
+                pose.position.y = tvecs[i][0][1] * -1
                 pose.position.z = tvecs[i][0][0]
                 rot_matrix = np.eye(4)
                 rot_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
