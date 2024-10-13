@@ -206,27 +206,42 @@ def main():
     goal_pose1 = PoseStamped()
     goal_pose1.header.frame_id = 'map'
     goal_pose1.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose1.pose.position.x = 27.0
-    goal_pose1.pose.position.y = -4.0
+    goal_pose1.pose.position.x = -6.7
+    goal_pose1.pose.position.y = 0.0
     goal_pose1.pose.orientation.w = 0.0
     goal_pose1.pose.orientation.z = 1.0
 
     goal_pose2 = PoseStamped()
     goal_pose2.header.frame_id = 'map'
     goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose2.pose.position.x = -6.7
-    goal_pose2.pose.position.y = 0.0
+    goal_pose2.pose.position.x = 27.0
+    goal_pose2.pose.position.y = -0.5
     goal_pose2.pose.orientation.w = 0.0
     goal_pose2.pose.orientation.z = 1.0
 
+
+    goal_pose3 = PoseStamped()
+    goal_pose3.header.frame_id = 'map'
+    goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose3.pose.position.x = 27.5
+    goal_pose3.pose.position.y = -4.5
+    goal_pose3.pose.orientation.w = 0.0
+    goal_pose3.pose.orientation.z = 1.0
+
     # Append the poses as per your request
+    goal_poses.append(goal_pose1)
+    goal_poses.append(goal_pose2)
+    goal_poses.append(goal_pose3)
     goal_poses.append(goal_pose2)
     goal_poses.append(goal_pose1)
     goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
+    goal_poses.append(goal_pose3)
     goal_poses.append(goal_pose2)
     goal_poses.append(goal_pose1)
     goal_poses.append(goal_pose2)
+    goal_poses.append(goal_pose3)
+    goal_poses.append(goal_pose2)
+    goal_poses.append(goal_pose1)
 
     # Start following the waypoints
     nav_start = navigator.get_clock().now()
@@ -237,11 +252,8 @@ def main():
         i += 1
         feedback = navigator.getFeedback()
         if feedback and i % 5 == 0:
-            print(
-                'Executing current waypoint: '
-                + '/'
-                + str(len(goal_poses))
-            )
+            print('navigating multiple points.')
+            
             now = navigator.get_clock().now()
 
             # Cancel task if it takes too long
@@ -249,7 +261,7 @@ def main():
                 navigator.cancelTask()
 
             # Preempt task with new goal if it takes too long
-            if now - nav_start > Duration(seconds=100.0):
+            if now - nav_start > Duration(seconds=300.0):
                 goal_pose4 = PoseStamped()
                 goal_pose4.header.frame_id = 'map'
                 goal_pose4.header.stamp = now.to_msg()
