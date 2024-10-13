@@ -189,6 +189,7 @@ class ArucoNode(rclpy.node.Node):
                 transform = self.combine_transforms(combined_transform1, base_link_to_camera_link)
                 pose = tf2_geometry_msgs.do_transform_pose(self.pose_stamped.pose, transform)
                 if pose is not None and self.first_image_processed is not True:
+                    #tolerance of x in map
                     pose.position.x = pose.position.x + 1.5
                     self.get_logger().info(f"Transformed Pose: {pose}")
                     self.print_transform(transform)
