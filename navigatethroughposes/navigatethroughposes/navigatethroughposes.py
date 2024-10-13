@@ -25,74 +25,33 @@ from rclpy.time import Time
 import tf_transformations
 
 class NavigateToARUco(rclpy.node.Node):
-    def __init__(self, nav):
+    def __init__(self):
         super().__init__("NavigateToARUco")
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.subscription = self.create_subscription(
             PoseArray,
             '/aruco_poses',
-            lambda msg: self.aruco_pose_callback(msg, nav),
+            self.aruco_pose_callback,
             10
         )
+        self.pose_publisher = ARUcoPosePublisher(self.tf_buffer, self.tf_listener)
 
-    def aruco_pose_callback(self, msg: PoseArray, navigator):
-        if msg.poses:
+    def aruco_pose_callback(self, msg: PoseArray):
+        if msg.poses and not self.pose_publisher.get_pose():
+            print("setting pose of aruco")
             aruco_pose = msg.poses[0]
-            try:
-                max_attempts = 5
-                attempts = 0
-                print('here')
-                while attempts < max_attempts:
-                    pose_stamped = PoseStamped()
-                    pose_stamped.header.stamp = navigator.get_clock().now().to_msg()
-                    pose_stamped.header.frame_id = 'map'
-                    pose_stamped.pose.position.x = aruco_pose.position.x
-                    pose_stamped.pose.position.y = aruco_pose.position.y
-                    pose_stamped.pose.position.z = 0.0
-                    pose_stamped.pose.orientation.x = 0.0
-                    pose_stamped.pose.orientation.y = 0.0
-                    pose_stamped.pose.orientation.z = 1.0
-                    pose_stamped.pose.orientation.w = 0.0
-                    navigator.goToPose(pose_stamped)
-                    i = 0
-                    while not navigator.isTaskComplete():
-                        i = i + 1
-                        feedback = navigator.getFeedback()
-                        if feedback and i % 5 == 0:
-                            print(
-                                'Estimated time of arrival: '
-                                + '{0:.0f}'.format(
-                                Duration.from_msg(feedback.estimated_time_remaining).nanoseconds
-                                / 1e9
-                                )
-                                + ' seconds.'
-                            )
-                            # Some navigation timeout to demo cancellation
-                            if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
-                                navigator.cancelTask()
-
-                            # Some navigation request change to demo preemption
-                            if Duration.from_msg(feedback.navigation_time) > Duration(seconds=18.0):
-                                pose_stamped.pose.position.x = 0.0
-                                pose_stamped.pose.position.y = 0.0
-                                pose_stamped.pose.orientation.w = 1.0
-                                pose_stamped.pose.orientation.z = 0.0
-                                navigator.goToPose(pose_stamped)
-
-                        # Do something depending on the return code
-                        result = navigator.getResult()
-                        if result == TaskResult.SUCCEEDED:
-                            print('ARUCO Goal succeeded!')
-                        elif result == TaskResult.CANCELED:
-                            print('ARUCO Goal was canceled!')
-                        elif result == TaskResult.FAILED:
-                            print('ARUCO Goal failed!')
-                        else:
-                            print('ARUCO Goal has an invalid return status!')
-                        break
-            except Exception as e:
-                self.get_logger().error(f"Failed to transform aruco pose to map frame: {str(e)}")
+            pose_stamped = PoseStamped()
+            pose_stamped.header.stamp = self.get_clock().now().to_msg()
+            pose_stamped.header.frame_id = 'map'
+            pose_stamped.pose.position.x = aruco_pose.position.x
+            pose_stamped.pose.position.y = aruco_pose.position.y
+            pose_stamped.pose.position.z = 0.0
+            pose_stamped.pose.orientation.x = 0.0
+            pose_stamped.pose.orientation.y = 0.0
+            pose_stamped.pose.orientation.z = 1.0
+            pose_stamped.pose.orientation.w = 0.0
+            self.pose_publisher.update_pose(pose_stamped)
 
 
 class LocalizationNode(Node):
@@ -102,15 +61,13 @@ class LocalizationNode(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.timer = self.create_timer(1.0, self.timer_callback)
-        self.initial_pose_publisher = InitialPosePublisher(self.tf_buffer, self.tf_listener)
+        self.pose_publisher = PosePublisher(self.tf_buffer, self.tf_listener)
 
     def timer_callback(self):
         try:
             time_now = self.get_clock().now()
-
             seconds, nanoseconds = time_now.seconds_nanoseconds()
             target_time = Time(seconds=seconds, nanoseconds=nanoseconds) - Duration(seconds=1.0)
-
             map_to_odom = self.tf_buffer.lookup_transform(
                 target_frame='map',
                 source_frame='odom',
@@ -123,13 +80,10 @@ class LocalizationNode(Node):
                 time=Time(), 
                 timeout=Duration(seconds=2.0)
             )
-
             combined_transform = self.combine_transforms(map_to_odom, odom_to_base_link)
             self.print_transform(combined_transform)
             if combined_transform:
-                self.initial_pose_publisher.update_initial_pose(combined_transform)
-
-
+                self.pose_publisher.update_pose(combined_transform)
         except TransformException as ex:
             self.get_logger().warn('%s; retrying...' % ex)
 
@@ -177,15 +131,39 @@ class LocalizationNode(Node):
         for row in rot_matrix:
             self.get_logger().info(f' {row[0]:.3f} {row[1]:.3f} {row[2]:.3f} {row[3]:.3f}')
 
-class InitialPosePublisher(Node):
+class ARUcoPosePublisher(Node):
 
     def __init__(self, tf_buffer, tf_listener):
-        super().__init__('initial_pose_publisher')
+        super().__init__('ARUco_pose_publisher')
         self.tf_buffer = tf_buffer
         self.tf_listener = tf_listener
-        self.initial_pose = None
+        self.pose = None
 
-    def update_initial_pose(self, trans):
+    def update_pose(self, trans):
+        pose_msg = PoseStamped()
+        pose_msg.header.frame_id = 'map'
+        pose_msg.header.stamp = self.get_clock().now().to_msg()
+        pose_msg.pose.position.x = trans.pose.position.x
+        pose_msg.pose.position.y = trans.pose.position.y
+        pose_msg.pose.position.z = trans.pose.position.z
+        pose_msg.pose.orientation.x = trans.pose.orientation.x
+        pose_msg.pose.orientation.y = trans.pose.orientation.y
+        pose_msg.pose.orientation.z = trans.pose.orientation.z
+        pose_msg.pose.orientation.w = trans.pose.orientation.w
+        self.pose = pose_msg
+
+    def get_pose(self):
+        return self.pose
+
+class PosePublisher(Node):
+
+    def __init__(self, tf_buffer, tf_listener):
+        super().__init__('pose_publisher')
+        self.tf_buffer = tf_buffer
+        self.tf_listener = tf_listener
+        self.pose = None
+
+    def update_pose(self, trans):
         pose_msg = PoseStamped()
         pose_msg.header.frame_id = 'map'
         pose_msg.header.stamp = self.get_clock().now().to_msg()
@@ -193,20 +171,20 @@ class InitialPosePublisher(Node):
         pose_msg.pose.position.y = trans.transform.translation.y
         pose_msg.pose.position.z = trans.transform.translation.z
         pose_msg.pose.orientation = trans.transform.rotation
-        self.initial_pose = pose_msg
+        self.pose = pose_msg
 
-    def get_initial_pose(self):
-        return self.initial_pose
+    def get_pose(self):
+        return self.pose
 
 def main():
     rclpy.init()
     logger = get_logger('localization_main')
     navigator = BasicNavigator()
     localization_node = LocalizationNode()
-    while rclpy.ok() and not localization_node.initial_pose_publisher.get_initial_pose():
+    while rclpy.ok() and not localization_node.pose_publisher.get_pose():
         rclpy.spin_once(localization_node, timeout_sec=1.0)
 
-    initial_pose = localization_node.initial_pose_publisher.get_initial_pose()
+    initial_pose = localization_node.pose_publisher.get_pose()
     if initial_pose:
         logger.info('Got initial pose from TF')
         navigator.setInitialPose(initial_pose)
@@ -229,7 +207,7 @@ def main():
     goal_pose1.header.frame_id = 'map'
     goal_pose1.header.stamp = navigator.get_clock().now().to_msg()
     goal_pose1.pose.position.x = 27.0
-    goal_pose1.pose.position.y = 0.0
+    goal_pose1.pose.position.y = -4.0
     goal_pose1.pose.orientation.w = 0.0
     goal_pose1.pose.orientation.z = 1.0
 
@@ -243,12 +221,12 @@ def main():
 
     # Append the poses as per your request
     goal_poses.append(goal_pose2)
-    # goal_poses.append(goal_pose1)
-    # goal_poses.append(goal_pose2)
-    # goal_poses.append(goal_pose1)
-    # goal_poses.append(goal_pose2)
-    # goal_poses.append(goal_pose1)
-    # goal_poses.append(goal_pose2)
+    goal_poses.append(goal_pose1)
+    goal_poses.append(goal_pose2)
+    goal_poses.append(goal_pose1)
+    goal_poses.append(goal_pose2)
+    goal_poses.append(goal_pose1)
+    goal_poses.append(goal_pose2)
 
     # Start following the waypoints
     nav_start = navigator.get_clock().now()
@@ -281,11 +259,40 @@ def main():
                 goal_pose4.pose.orientation.z = 1.0
                 nav_start = now
                 navigator.goToPose(goal_pose4)
-
-    aruco_navigator = NavigateToARUco(navigator)
-    while rclpy.ok() and not navigator.isTaskComplete():
-        print("spin")
+                
+    localization_node.destroy_node()
+    aruco_navigator = NavigateToARUco()
+    print("getting pose from aruco node")
+    while rclpy.ok() and not aruco_navigator.pose_publisher.get_pose():
+        print("spin once again")
         rclpy.spin_once(aruco_navigator, timeout_sec=1.0)
+    nav_start = navigator.get_clock().now()
+    print("navigate to aruco pose")
+    navigator.goToPose(aruco_navigator.pose_publisher.get_pose())
+    i = 0
+    while not navigator.isTaskComplete():
+        i += 1
+        feedback = navigator.getFeedback()
+        if feedback and i % 5 == 0:
+            print('Executing aruco pose: ')
+            now = navigator.get_clock().now()
+
+            # Cancel task if it takes too long
+            if now - nav_start > Duration(seconds=600.0):
+                navigator.cancelTask()
+
+            # Preempt task with new goal if it takes too long
+            if now - nav_start > Duration(seconds=100.0):
+                goal_pose4 = PoseStamped()
+                goal_pose4.header.frame_id = 'map'
+                goal_pose4.header.stamp = now.to_msg()
+                goal_pose4.pose.position.x = 0.0
+                goal_pose4.pose.position.y = 0.0
+                goal_pose4.pose.orientation.w = 0.0
+                goal_pose4.pose.orientation.z = 1.0
+                nav_start = now
+                navigator.goToPose(goal_pose4)
+
     # 你的導航邏輯
     result = navigator.getResult()
     if result == TaskResult.SUCCEEDED:
@@ -295,11 +302,8 @@ def main():
     elif result == TaskResult.FAILED:
         print('Goal failed!')
     else:
-        print('Goal has an invalid return status!')      
-    # Check result of navigation
-    # 關閉導航與節點
+        print('Goal has an invalid return status!')
     aruco_navigator.destroy_node()
-    localization_node.destroy_node()
     navigator.lifecycleShutdown()
 
     rclpy.shutdown()
