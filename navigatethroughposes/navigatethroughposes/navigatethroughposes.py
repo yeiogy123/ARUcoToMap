@@ -206,42 +206,70 @@ def main():
     goal_pose1 = PoseStamped()
     goal_pose1.header.frame_id = 'map'
     goal_pose1.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose1.pose.position.x = -6.7
-    goal_pose1.pose.position.y = 0.0
+    goal_pose1.pose.position.x = 7.1
+    goal_pose1.pose.position.y = 0.1
     goal_pose1.pose.orientation.w = 0.0
-    goal_pose1.pose.orientation.z = 1.0
+    goal_pose1.pose.orientation.z = 0.0
 
     goal_pose2 = PoseStamped()
     goal_pose2.header.frame_id = 'map'
     goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose2.pose.position.x = 27.0
-    goal_pose2.pose.position.y = -0.5
+    goal_pose2.pose.position.x = 33.0
+    goal_pose2.pose.position.y = 1.9
     goal_pose2.pose.orientation.w = 0.0
-    goal_pose2.pose.orientation.z = 1.0
+    goal_pose2.pose.orientation.z = 0.0
 
 
     goal_pose3 = PoseStamped()
     goal_pose3.header.frame_id = 'map'
     goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose3.pose.position.x = 27.5
-    goal_pose3.pose.position.y = -4.5
+    goal_pose3.pose.position.x = 33.0
+    goal_pose3.pose.position.y = -1.5
     goal_pose3.pose.orientation.w = 0.0
-    goal_pose3.pose.orientation.z = 1.0
+    goal_pose3.pose.orientation.z = 0.0
+
+
+    goal_pose4 = PoseStamped()
+    goal_pose4.header.frame_id = 'map'
+    goal_pose4.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose4.pose.position.x = 42.9
+    goal_pose4.pose.position.y = 1.0
+    goal_pose4.pose.orientation.w = 0.0
+    goal_pose4.pose.orientation.z = 0.0
+    
+    goal_pose5 = PoseStamped()
+    goal_pose5.header.frame_id = 'map'
+    goal_pose5.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose5.pose.position.x = 35.0
+    goal_pose5.pose.position.y = -1.5
+    goal_pose5.pose.orientation.w = 0.0
+    goal_pose5.pose.orientation.z = 0.0
+
+    goal_pose6 = PoseStamped()
+    goal_pose6.header.frame_id = 'map'
+    goal_pose6.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose6.pose.position.x = 35.0
+    goal_pose6.pose.position.y = 1.9
+    goal_pose6.pose.orientation.w = 0.0
+    goal_pose6.pose.orientation.z = 1.0
+        
+    goal_pose7 = PoseStamped()
+    goal_pose7.header.frame_id = 'map'
+    goal_pose7.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose7.pose.position.x = 7.1
+    goal_pose7.pose.position.y = 0.1
+    goal_pose7.pose.orientation.w = 0.0
+    goal_pose7.pose.orientation.z = 1.0
+
 
     # Append the poses as per your request
     goal_poses.append(goal_pose1)
     goal_poses.append(goal_pose2)
     goal_poses.append(goal_pose3)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose3)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose3)
-    goal_poses.append(goal_pose2)
-    goal_poses.append(goal_pose1)
+    goal_poses.append(goal_pose4)
+    goal_poses.append(goal_pose5)
+    goal_poses.append(goal_pose6)
+    goal_poses.append(goal_pose7)
 
     # Start following the waypoints
     nav_start = navigator.get_clock().now()
@@ -273,37 +301,37 @@ def main():
                 navigator.goToPose(goal_pose4)
                 
     localization_node.destroy_node()
-    aruco_navigator = NavigateToARUco()
-    print("getting pose from aruco node")
-    while rclpy.ok() and not aruco_navigator.pose_publisher.get_pose():
-        print("spin once again")
-        rclpy.spin_once(aruco_navigator, timeout_sec=1.0)
-    nav_start = navigator.get_clock().now()
-    print("navigate to aruco pose")
-    navigator.goToPose(aruco_navigator.pose_publisher.get_pose())
-    i = 0
-    while not navigator.isTaskComplete():
-        i += 1
-        feedback = navigator.getFeedback()
-        if feedback and i % 5 == 0:
-            print('Executing aruco pose: ')
-            now = navigator.get_clock().now()
+    # aruco_navigator = NavigateToARUco()
+    # print("getting pose from aruco node")
+    # while rclpy.ok() and not aruco_navigator.pose_publisher.get_pose():
+    #     print("spin once again")
+    #     rclpy.spin_once(aruco_navigator, timeout_sec=1.0)
+    # nav_start = navigator.get_clock().now()
+    # print("navigate to aruco pose")
+    # navigator.goToPose(aruco_navigator.pose_publisher.get_pose())
+    # i = 0
+    # while not navigator.isTaskComplete():
+    #     i += 1
+    #     feedback = navigator.getFeedback()
+    #     if feedback and i % 5 == 0:
+    #         print('Executing aruco pose: ')
+    #         now = navigator.get_clock().now()
 
-            # Cancel task if it takes too long
-            if now - nav_start > Duration(seconds=600.0):
-                navigator.cancelTask()
+    #         # Cancel task if it takes too long
+    #         if now - nav_start > Duration(seconds=600.0):
+    #             navigator.cancelTask()
 
-            # Preempt task with new goal if it takes too long
-            if now - nav_start > Duration(seconds=100.0):
-                goal_pose4 = PoseStamped()
-                goal_pose4.header.frame_id = 'map'
-                goal_pose4.header.stamp = now.to_msg()
-                goal_pose4.pose.position.x = 0.0
-                goal_pose4.pose.position.y = 0.0
-                goal_pose4.pose.orientation.w = 0.0
-                goal_pose4.pose.orientation.z = 1.0
-                nav_start = now
-                navigator.goToPose(goal_pose4)
+    #         # Preempt task with new goal if it takes too long
+    #         if now - nav_start > Duration(seconds=100.0):
+    #             goal_pose4 = PoseStamped()
+    #             goal_pose4.header.frame_id = 'map'
+    #             goal_pose4.header.stamp = now.to_msg()
+    #             goal_pose4.pose.position.x = 0.0
+    #             goal_pose4.pose.position.y = 0.0
+    #             goal_pose4.pose.orientation.w = 0.0
+    #             goal_pose4.pose.orientation.z = 1.0
+    #             nav_start = now
+    #             navigator.goToPose(goal_pose4)
 
     # 你的導航邏輯
     result = navigator.getResult()
