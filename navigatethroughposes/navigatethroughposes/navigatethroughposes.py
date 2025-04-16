@@ -224,7 +224,7 @@ def main():
     goal_pose3.header.frame_id = 'map'
     goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
     goal_pose3.pose.position.x = 33.0
-    goal_pose3.pose.position.y = -1.5
+    goal_pose3.pose.position.y = -2.0
     goal_pose3.pose.orientation.w = 0.0
     goal_pose3.pose.orientation.z = 0.0
 
@@ -232,34 +232,51 @@ def main():
     goal_pose4 = PoseStamped()
     goal_pose4.header.frame_id = 'map'
     goal_pose4.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose4.pose.position.x = 42.9
-    goal_pose4.pose.position.y = 1.0
+    goal_pose4.pose.position.x = 42.0
+    goal_pose4.pose.position.y = 0.3
     goal_pose4.pose.orientation.w = 0.0
-    goal_pose4.pose.orientation.z = 0.0
-    
+    goal_pose4.pose.orientation.z = 1.0
+
     goal_pose5 = PoseStamped()
     goal_pose5.header.frame_id = 'map'
     goal_pose5.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose5.pose.position.x = 35.0
-    goal_pose5.pose.position.y = -1.5
+    goal_pose5.pose.position.x = 43.4
+    goal_pose5.pose.position.y = 0.6
     goal_pose5.pose.orientation.w = 0.0
-    goal_pose5.pose.orientation.z = 0.0
+    goal_pose5.pose.orientation.z = 1.0
+
 
     goal_pose6 = PoseStamped()
     goal_pose6.header.frame_id = 'map'
     goal_pose6.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose6.pose.position.x = 35.0
-    goal_pose6.pose.position.y = 1.9
+    goal_pose6.pose.position.x = 41.3
+    goal_pose6.pose.position.y = -0.8
     goal_pose6.pose.orientation.w = 0.0
     goal_pose6.pose.orientation.z = 1.0
-        
+    
     goal_pose7 = PoseStamped()
     goal_pose7.header.frame_id = 'map'
     goal_pose7.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose7.pose.position.x = 7.1
-    goal_pose7.pose.position.y = 0.1
+    goal_pose7.pose.position.x = 36.0
+    goal_pose7.pose.position.y = -1.7
     goal_pose7.pose.orientation.w = 0.0
     goal_pose7.pose.orientation.z = 1.0
+
+    goal_pose8 = PoseStamped()
+    goal_pose8.header.frame_id = 'map'
+    goal_pose8.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose8.pose.position.x = 36.0
+    goal_pose8.pose.position.y = 1.9
+    goal_pose8.pose.orientation.w = 0.0
+    goal_pose8.pose.orientation.z = 1.0
+        
+    goal_pose9 = PoseStamped()
+    goal_pose9.header.frame_id = 'map'
+    goal_pose9.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose9.pose.position.x = 7.1
+    goal_pose9.pose.position.y = 0.1
+    goal_pose9.pose.orientation.w = 0.0
+    goal_pose9.pose.orientation.z = 1.0
 
 
     # Append the poses as per your request
@@ -270,6 +287,8 @@ def main():
     goal_poses.append(goal_pose5)
     goal_poses.append(goal_pose6)
     goal_poses.append(goal_pose7)
+    goal_poses.append(goal_pose8)
+    goal_poses.append(goal_pose9)
 
     # Start following the waypoints
     nav_start = navigator.get_clock().now()
