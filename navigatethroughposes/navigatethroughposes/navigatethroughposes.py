@@ -232,19 +232,18 @@ def main():
     goal_pose4 = PoseStamped()
     goal_pose4.header.frame_id = 'map'
     goal_pose4.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose4.pose.position.x = 42.0
-    goal_pose4.pose.position.y = 0.3
+    goal_pose4.pose.position.x = 38.4
+    goal_pose4.pose.position.y = -1.0
     goal_pose4.pose.orientation.w = 0.0
-    goal_pose4.pose.orientation.z = 1.0
+    goal_pose4.pose.orientation.z = 0.0
 
-    # goal_pose5 = PoseStamped()
-    # goal_pose5.header.frame_id = 'map'
-    # goal_pose5.header.stamp = navigator.get_clock().now().to_msg()
-    # goal_pose5.pose.position.x = 42.4
-    # goal_pose5.pose.position.y = 0.67
-    # goal_pose5.pose.orientation.w = 0.0
-    # goal_pose5.pose.orientation.z = 1.0
-
+    goal_pose5 = PoseStamped()
+    goal_pose5.header.frame_id = 'map'
+    goal_pose5.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose5.pose.position.x = 42.0
+    goal_pose5.pose.position.y = 0.3
+    goal_pose5.pose.orientation.w = 0.0
+    goal_pose5.pose.orientation.z = 1.0
 
     goal_pose6 = PoseStamped()
     goal_pose6.header.frame_id = 'map'
@@ -273,18 +272,17 @@ def main():
     goal_pose9 = PoseStamped()
     goal_pose9.header.frame_id = 'map'
     goal_pose9.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose9.pose.position.x = 7.1
-    goal_pose9.pose.position.y = 0.1
-    goal_pose9.pose.orientation.w = 0.0
-    goal_pose9.pose.orientation.z = 1.0
-
+    goal_pose9.pose.position.x = 8.4
+    goal_pose9.pose.position.y = 0.28
+    goal_pose9.pose.orientation.z = -0.6374
+    goal_pose9.pose.orientation.w= 0.7705
 
     # Append the poses as per your request
     goal_poses.append(goal_pose1)
     goal_poses.append(goal_pose2)
     goal_poses.append(goal_pose3)
     goal_poses.append(goal_pose4)
-    # goal_poses.append(goal_pose5)
+    goal_poses.append(goal_pose5)
     goal_poses.append(goal_pose6)
     goal_poses.append(goal_pose7)
     goal_poses.append(goal_pose8)
@@ -309,15 +307,15 @@ def main():
 
             # Preempt task with new goal if it takes too long
             if now - nav_start > Duration(seconds=300.0):
-                goal_pose4 = PoseStamped()
-                goal_pose4.header.frame_id = 'map'
-                goal_pose4.header.stamp = now.to_msg()
-                goal_pose4.pose.position.x = 0.0
-                goal_pose4.pose.position.y = 0.0
-                goal_pose4.pose.orientation.w = 0.0
-                goal_pose4.pose.orientation.z = 1.0
+                goal_pose10 = PoseStamped()
+                goal_pose10.header.frame_id = 'map'
+                goal_pose10.header.stamp = now.to_msg()
+                goal_pose10.pose.position.x = 0.0
+                goal_pose10.pose.position.y = 0.0
+                goal_pose10.pose.orientation.w = 0.0
+                goal_pose10.pose.orientation.z = 1.0
                 nav_start = now
-                navigator.goToPose(goal_pose4)
+                navigator.goToPose(goal_pose10)
                 
     localization_node.destroy_node()
     # aruco_navigator = NavigateToARUco()
